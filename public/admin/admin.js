@@ -182,7 +182,7 @@ function formatAdminPrice(amount, currency) {
 async function loadOffers() {
   const listEl = document.getElementById('offers-list');
   try {
-    const offers = await adminApi('/api/admin/offers');
+    const { offers } = await adminApi('/api/admin/offers');
     listEl.innerHTML = '';
     if (offers.length === 0) {
       listEl.innerHTML = `<p style="color:var(--text-muted)">${window.i18n.t('home.empty')}</p>`;
@@ -407,7 +407,7 @@ async function setupUploadcare() {
 async function loadTransactions() {
   const body = document.getElementById('transactions-body');
   try {
-    const txs = await adminApi('/api/admin/transactions');
+    const { transactions: txs } = await adminApi('/api/admin/transactions');
     body.innerHTML = '';
     if (txs.length === 0) {
       body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">${window.i18n.t('admin.noTransactions')}</td></tr>`;
