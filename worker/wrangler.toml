@@ -20,7 +20,7 @@ compatibility_flags = ["nodejs_compat"]
 # -------------------------------------------------------------
 
 [vars]
-FIREBASE_PROJECT_ID = "your-firebase-project-id"
+FIREBASE_PROJECT_ID = "beta-arsenal"
 ADMIN_EMAIL = "admin@beta-arsenal.com"
 PUBLIC_SITE_URL = "https://beta-arsenal.pages.dev"
 FEDAPAY_PUBLIC_KEY = "pk_sandbox_xxxxxxxxxxxxxxxxxxxxxxxx"
