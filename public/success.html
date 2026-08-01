@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bêta Arsenal — Paiement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- ============ HEADER ============ -->
+    <header class="site-header">
+      <div class="container header-inner">
+        <a href="/" class="brand">
+          <span class="brand-mark">β</span>
+          <span class="brand-name">Bêta Arsenal</span>
+        </a>
+        <div class="header-actions">
+          <button id="lang-toggle" class="btn btn-ghost" aria-label="Changer la langue">
+            <span id="lang-label">EN</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ MAIN ============ -->
+    <main class="container main-content success-main">
+      <div class="status-card" id="status-card">
+        <!-- Contenu dynamique selon le statut : pending / approved / declined -->
+      </div>
+    </main>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>© <span id="year"></span> Bêta Arsenal</p>
+        <nav class="footer-nav">
+          <a href="/" data-i18n="nav.home">Accueil</a>
+          <a href="legal.html" data-i18n="nav.legal">Légal</a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="js/i18n.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

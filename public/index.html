@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Bêta Arsenal - Boutique de produits numériques et services par Florian." />
+  <title>Bêta Arsenal — Catalogue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Layout racine : header + main + footer collé en bas -->
+  <div class="app-shell">
+    <!-- ============ HEADER ============ -->
+    <header class="site-header">
+      <div class="container header-inner">
+        <a href="/" class="brand">
+          <span class="brand-mark">β</span>
+          <span class="brand-name">Bêta Arsenal</span>
+        </a>
+        <div class="header-actions">
+          <button id="lang-toggle" class="btn btn-ghost" aria-label="Changer la langue">
+            <span id="lang-label">EN</span>
+          </button>
+          <a href="legal.html" class="btn btn-ghost" data-i18n="nav.legal">Légal</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ MAIN ============ -->
+    <main class="container main-content">
+      <!-- Bannière / hero -->
+      <section class="hero">
+        <h1 data-i18n="home.heroTitle">Produits numériques & services premium</h1>
+        <p data-i18n="home.heroSubtitle">
+          Livraison instantanée après paiement. Accès sécurisé à vos fichiers et services.
+        </p>
+      </section>
+
+      <!-- Filtres par type -->
+      <div class="filters" role="tablist" aria-label="Filtres catalogue">
+        <button class="chip chip-active" role="tab" data-filter="all" data-i18n="home.filterAll">Tout</button>
+        <button class="chip" role="tab" data-filter="digital_product" data-i18n="home.filterDigital">Produits numériques</button>
+        <button class="chip" role="tab" data-filter="service" data-i18n="home.filterService">Services</button>
+      </div>
+
+      <!-- Grille catalogue (remplie en JS) -->
+      <section id="catalog" class="catalog-grid" aria-live="polite">
+        <!-- Skeletons de chargement -->
+        <div class="card-skeleton"></div>
+        <div class="card-skeleton"></div>
+        <div class="card-skeleton"></div>
+      </section>
+
+      <!-- État vide / erreur -->
+      <div id="catalog-empty" class="empty-state hidden">
+        <p data-i18n="home.empty">Aucune offre disponible pour le moment.</p>
+      </div>
+    </main>
+
+    <!-- ============ FOOTER (collé en bas) ============ -->
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>© <span id="year"></span> Bêta Arsenal — <span data-i18n="footer.by">par</span> Florian</p>
+        <nav class="footer-nav">
+          <a href="legal.html" data-i18n="nav.legal">Légal</a>
+          <a href="admin/login.html" data-i18n="nav.admin">Admin</a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+
+
+
+  <!-- ============ SCRIPTS ============ -->
+  <script type="module" src="js/firebase-config.js"></script>
+  <script type="module" src="js/i18n.js"></script>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "beta-arsenal-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend sécurisé Bêta Arsenal (Cloudflare Workers ESM)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.78.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "beta-arsenal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bêta Arsenal - Boutique mono-vendeur (produits numériques & services)",
+  "type": "module",
+  "scripts": {
+    "seed": "node scripts/seed.mjs",
+    "worker:dev": "cd worker && npm run dev",
+    "worker:deploy": "cd worker && npm run deploy"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

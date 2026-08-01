@@ -1,0 +1,35 @@
+# =============================================================
+# Bêta Arsenal - Worker Cloudflare (wrangler.toml)
+# =============================================================
+# Documentation : https://developers.cloudflare.com/workers/wrangler/configuration/
+# =============================================================
+
+name = "beta-arsenal-api"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# -------------------------------------------------------------
+# Variables NON secrètes (visibles, configurables ici).
+# Les SECRETS doivent être définis via :
+#   wrangler secret put FIREBASE_CLIENT_EMAIL
+#   wrangler secret put FIREBASE_PRIVATE_KEY
+#   wrangler secret put FEDAPAY_SECRET_KEY
+#   wrangler secret put FEDAPAY_WEBHOOK_SECRET
+#   wrangler secret put UPLOADCARE_SECRET_KEY
+# -------------------------------------------------------------
+
+[vars]
+FIREBASE_PROJECT_ID = "your-firebase-project-id"
+ADMIN_EMAIL = "admin@beta-arsenal.com"
+PUBLIC_SITE_URL = "https://beta-arsenal.pages.dev"
+FEDAPAY_PUBLIC_KEY = "pk_sandbox_xxxxxxxxxxxxxxxxxxxxxxxx"
+UPLOADCARE_PUBLIC_KEY = "xxxxxxxxxxxxxxxxxxxxxxxx"
+# Mode FedaPay : "sandbox" ou "live"
+FEDAPAY_MODE = "sandbox"
+
+# -------------------------------------------------------------
+# Environnement de production (optionnel)
+# -------------------------------------------------------------
+[env.production]
+name = "beta-arsenal-api"
