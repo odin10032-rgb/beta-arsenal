@@ -9,12 +9,12 @@
 
 // --- Remplacez ces valeurs par celles de votre projet Firebase ---
 export const firebaseConfig = {
-  apiKey: 'AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-  authDomain: 'your-project.firebaseapp.com',
-  projectId: 'your-firebase-project-id',
-  storageBucket: 'your-project.appspot.com',
-  messagingSenderId: '1234567890',
-  appId: '1:1234567890:web:abcdef123456',
+  apiKey: 'AIzaSyDMnd5yjiz_RCWFVdGeFkfZEOpm06siqnU',
+  authDomain: 'beta-arsenal.firebaseapp.com',
+  projectId: 'beta-arsenal',
+  storageBucket: 'beta-arsenal.firebasestorage.app',
+  messagingSenderId: '546973759589',
+  appId: '1:546973759589:web:e92fa2907521586c7e2e8c',
 };
 
 // --- URL du backend (Cloudflare Worker) ---
@@ -22,7 +22,7 @@ export const firebaseConfig = {
 export const WORKER_API_URL =
   (typeof window !== 'undefined' && window.location.hostname === 'localhost')
     ? 'http://localhost:8787'
-    : 'https://beta-arsenal-api.your-subdomain.workers.dev';
+    : 'https://beta-arsenal-api.aimane-project-api.workers.dev';
 
 // --- Charge dynamiquement le SDK Firebase Auth (modular) ---
 let _auth = null;
@@ -62,4 +62,4 @@ export async function getFirestore() {
 
 // Email admin attendu (réservé à la connexion admin ; la vérification
 // finale côté Worker vérifie aussi ADMIN_EMAIL).
-export const ADMIN_EMAIL = 'admin@beta-arsenal.com';
+export const ADMIN_EMAIL = 'odin10032@gmail.com';
