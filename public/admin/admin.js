@@ -17,14 +17,14 @@ const path = window.location.pathname;
 // =============================================================
 // PAGE LOGIN
 // =============================================================
-if (path.endsWith('/admin/login.html')) {
+if (path.endsWith('/admin/login.html') || path.endsWith('/admin/login')) {
   initLoginPage();
 }
 
 // =============================================================
 // PAGE DASHBOARD
 // =============================================================
-if (path.endsWith('/admin/dashboard.html')) {
+if (path.endsWith('/admin/dashboard.html') || path.endsWith('/admin/dashboard')) {
   initDashboardPage();
 }
 
