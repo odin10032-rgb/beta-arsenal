@@ -1,13 +1,17 @@
 {
   "name": "beta-arsenal",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Bêta Arsenal - Boutique mono-vendeur (produits numériques & services)",
+  "description": "Bêta Arsenal - Boutique mono-vendeur (produits numériques & services) - Stack Cloudflare (Pages + Workers + D1)",
   "type": "module",
   "scripts": {
     "seed": "node scripts/seed.mjs",
+    "seed:remote": "node scripts/seed.mjs --remote",
+    "create-admin": "node scripts/create-admin.mjs",
     "worker:dev": "cd worker && npm run dev",
-    "worker:deploy": "cd worker && npm run deploy"
+    "worker:deploy": "cd worker && npm run deploy",
+    "worker:migrate:local": "cd worker && npm run db:migrate:local",
+    "worker:migrate:remote": "cd worker && npm run db:migrate:remote"
   },
   "engines": {
     "node": ">=18"

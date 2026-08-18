@@ -1,16 +1,29 @@
-# Variables NON secrètes pour le développement local du Worker (wrangler dev)
+# Variables pour le développement local du Worker (wrangler dev --local)
 # Copiez ce fichier vers `.dev.vars` et remplissez les valeurs.
 # Ne committez jamais `.dev.vars`.
 
-FIREBASE_PROJECT_ID=your-firebase-project-id
-FIREBASE_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"
+# --- D1 : pas de variable, le binding est dans wrangler.toml ---
+
+# --- Auth maison ---
+# Secret JWT : 32+ octets aléatoires. Générez avec :
+#   openssl rand -base64 48
+JWT_SECRET=change-me-with-a-long-random-secret-at-least-32-bytes
 ADMIN_EMAIL=admin@beta-arsenal.com
+
+# --- URLs ---
 PUBLIC_SITE_URL=http://localhost:3000
 WORKER_API_URL=http://localhost:8787
+
+# --- FedaPay ---
 FEDAPAY_PUBLIC_KEY=pk_sandbox_xxxxxxxxxxxxxxxxxxxxxxxx
 FEDAPAY_SECRET_KEY=sk_sandbox_xxxxxxxxxxxxxxxxxxxxxxxx
 FEDAPAY_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxx
 FEDAPAY_MODE=sandbox
-UPLOADCARE_PUBLIC_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
-UPLOADCARE_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+
+# --- GitHub (stockage images produits) ---
+# Token PAT fine-grained avec permission "Contents: write" sur le dépôt.
+GITHUB_TOKEN=github_pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GITHUB_REPO_OWNER=your-github-username
+GITHUB_REPO_NAME=beta-arsenal
+GITHUB_BRANCH=main
+GITHUB_IMAGE_PATH=public/uploads/products

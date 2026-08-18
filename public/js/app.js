@@ -7,7 +7,7 @@
 // - Gère la page success.html : vérification du statut + polling.
 // =============================================================
 
-import { getFirestore, WORKER_API_URL } from './firebase-config.js';
+import { WORKER_API_URL } from './config.js';
 
 // ---- Vendeur fixe ----
 const SELLER_ID = 'florian';
@@ -73,11 +73,8 @@ async function initCatalog() {
   let activeFilter = 'all';
 
   try {
-    const db = await getFirestore();
-    const { collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const q = query(collection(db, 'offers'), where('is_active', '==', true));
-    const snapshot = await getDocs(q);
-    offers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const data = await api('/api/offers');
+    offers = Array.isArray(data) ? data : (data.offers || []);
   } catch (err) {
     console.error('Erreur chargement offres:', err);
     catalogEl.innerHTML = '';
@@ -126,9 +123,18 @@ function renderOfferCard(offer, lang) {
   const description = lang === 'fr' ? offer.description_fr : offer.description_en;
   const typeLabel = window.i18n.t(isDigital ? 'home.typeDigital' : 'home.typeService');
   const supported = FEDAPAY_SUPPORTED_CURRENCIES.includes(offer.currency);
+  const productUrl = `product.html?id=${encodeURIComponent(offer.id)}`;
 
   const card = document.createElement('article');
   card.className = 'offer-card';
+
+  // Image de couverture (1ère image si media_type=image)
+  const coverImage = offer.cover_image
+    ? `<a href="${productUrl}" class="offer-cover"><img src="${escapeHtml(offer.cover_image)}" alt="${escapeHtml(title)}" loading="lazy" /></a>`
+    : '';
+  const demoBadge = offer.has_demo
+    ? `<span class="demo-badge">▶ TikTok</span>`
+    : '';
 
   // Liens sociaux (optionnels)
   const socials = offer.social_links || {};
@@ -137,20 +143,120 @@ function renderOfferCard(offer, lang) {
     .map(([k, v]) => `<a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">${escapeHtml(k)}</a>`)
     .join('');
 
-    card.innerHTML = `
-    <span class="offer-type ${isDigital ? '' : 'service'}">${escapeHtml(typeLabel)}</span>
-    <h3 class="offer-title">${escapeHtml(title)}</h3>
-    <p class="offer-desc">${escapeHtml(description)}</p>
-    <div class="offer-price">${formatPrice(offer.price, offer.currency, lang)}</div>
-    ${socialsHtml ? `<div class="offer-socials">${socialsHtml}</div>` : ''}
-    <div class="offer-foot">
-      <a href="${escapeHtml(offer.sales_link || '#')}" ${offer.sales_link ? 'target="_blank" rel="noopener noreferrer"' : ''} class="btn btn-primary btn-block">
-        ${window.i18n.t('home.buy')}
-      </a>
+  card.innerHTML = `
+    ${coverImage}
+    <div class="offer-card-body">
+      <span class="offer-type ${isDigital ? '' : 'service'}">${escapeHtml(typeLabel)} ${demoBadge}</span>
+      <h3 class="offer-title"><a href="${productUrl}">${escapeHtml(title)}</a></h3>
+      <p class="offer-desc">${escapeHtml(description)}</p>
+      <div class="offer-price">${formatPrice(offer.price, offer.currency, lang)}</div>
+      ${socialsHtml ? `<div class="offer-socials">${socialsHtml}</div>` : ''}
+      <div class="offer-foot">
+        <a href="${productUrl}" class="btn btn-secondary btn-block" data-i18n="home.viewDetails">Voir détails</a>
+        ${supported
+          ? `<button class="btn btn-primary btn-block" data-buy="${offer.id}">${window.i18n.t('home.buy')}</button>`
+          : `<button class="btn btn-ghost btn-block" disabled>${window.i18n.t('home.unavailable')}</button>`
+        }
+      </div>
     </div>
   `;
+
+  // Bouton acheter -> ouvre la modale
+  const buyBtn = card.querySelector('[data-buy]');
+  if (buyBtn) {
+    buyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openBuyModal(offer);
+    });
+  }
+
   return card;
 }
+
+// =============================================================
+// MODALE D'ACHAT
+// =============================================================
+
+let _selectedOffer = null;
+
+function openBuyModal(offer) {
+  _selectedOffer = offer;
+  const modal = document.getElementById('buy-modal');
+  const preview = document.getElementById('buy-offer-preview');
+  const priceEl = document.getElementById('buy-price');
+  const errorEl = document.getElementById('buy-error');
+  const emailInput = document.getElementById('buyer-email');
+  const submitBtn = document.getElementById('buy-submit');
+
+  const lang = window.i18n.lang;
+  const title = lang === 'fr' ? offer.title_fr : offer.title_en;
+
+  preview.innerHTML = `
+    <div class="op-title">${escapeHtml(title)}</div>
+    <div class="op-price">${formatPrice(offer.price, offer.currency, lang)}</div>
+  `;
+  priceEl.textContent = formatPrice(offer.price, offer.currency, lang);
+  errorEl.classList.add('hidden');
+  emailInput.value = '';
+  submitBtn.disabled = false;
+  submitBtn.querySelector('span').textContent = window.i18n.t('buy.pay');
+
+  modal.classList.remove('hidden');
+}
+
+function closeBuyModal() {
+  document.getElementById('buy-modal').classList.add('hidden');
+  _selectedOffer = null;
+}
+
+async function handleBuySubmit(e) {
+  e.preventDefault();
+  const emailInput = document.getElementById('buyer-email');
+  const submitBtn = document.getElementById('buy-submit');
+  const errorEl = document.getElementById('buy-error');
+  const email = emailInput.value.trim();
+
+  // Validation email simple
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errorEl.textContent = window.i18n.t('buy.invalidEmail');
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (!_selectedOffer) return;
+
+  errorEl.classList.add('hidden');
+  submitBtn.disabled = true;
+  submitBtn.querySelector('span').textContent = window.i18n.t('buy.creating');
+
+  try {
+    // Crée la transaction côté Worker (qui appelle FedaPay)
+    const data = await api('/api/create-transaction', {
+      method: 'POST',
+      body: JSON.stringify({
+        offer_id: _selectedOffer.id,
+        buyer_email: email,
+      }),
+    });
+
+    // Redirige vers FedaPay pour le paiement
+    if (data.payment_url) {
+      window.location.href = data.payment_url;
+      return;
+    }
+    throw new Error('No payment URL returned');
+  } catch (err) {
+    console.error(err);
+    errorEl.textContent = window.i18n.t('buy.error') + ' (' + err.message + ')';
+    errorEl.classList.remove('hidden');
+    submitBtn.disabled = false;
+    submitBtn.querySelector('span').textContent = window.i18n.t('buy.pay');
+  }
+}
+
+// =============================================================
+// PAGE SUCCÈS (success.html)
+// =============================================================
 
 const POLL_INTERVAL = 10000; // 10 secondes
 const POLL_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -335,9 +441,15 @@ function initApp() {
   // Page succès ?
   initSuccessPage();
 
-  // =============================================================
-  // MODALE D'ACHAT (supprimée)
-  // =============================================================
+  // Modale d'achat : fermeture + soumission
+  const buyModal = document.getElementById('buy-modal');
+  if (buyModal) {
+    buyModal.querySelectorAll('[data-close-modal]').forEach((el) =>
+      el.addEventListener('click', closeBuyModal)
+    );
+    const form = document.getElementById('buy-form');
+    if (form) form.addEventListener('submit', handleBuySubmit);
+  }
 }
 
 // Surcharge i18n.toggle pour émettre un événement "langchange"

@@ -29,8 +29,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# --- Uploadcare / Firebase locaux ---
-serviceAccountKey.json
-firebase-adminsdk-*.json
-google-credentials.json
-.aider*
+# --- D1 local + secrets locaux ---
+scripts/seed.sql
+worker/.wrangler/

@@ -1,30 +1,27 @@
 // =============================================================
-// Bêta Arsenal - Logique administration
+// Bêta Arsenal - Logique administration (V3)
 // -------------------------------------------------------------
-// - Page login.html : connexion Firebase Auth + contrôle ADMIN_EMAIL.
-// - Page dashboard.html : CRUD offres, liste transactions, stats,
-//   régénération des liens de téléchargement expirés.
-// - Toutes les opérations sensibles passent par le Worker avec le
-//   token Firebase ID dans l'en-tête Authorization: Bearer <token>.
+// - Auth maison JWT (POST /api/admin/login)
+// - Formulaire unifié produit + service
+// - Section média : démo TikTok OU upload images GitHub
+// - Section présentation : résumé + points forts + extraits
+//   (listes dynamiques no-code)
 // =============================================================
 
-import { getFirebaseAuth, ADMIN_EMAIL, WORKER_API_URL } from '../js/firebase-config.js';
-import { UPLOADCARE_PUBLIC_KEY, loadUploadcareWidget } from '../js/uploadcare-config.js';
+import {
+  WORKER_API_URL,
+  saveAdminSession,
+  getAdminToken,
+  getAdminEmail,
+  clearAdminSession,
+} from '../js/config.js';
 
-// Détection de la page courante
 const path = window.location.pathname;
 
-// =============================================================
-// PAGE LOGIN
-// =============================================================
-if (path.endsWith('/admin/login.html') || path.endsWith('/admin/login')) {
+if (path.endsWith('/admin/login.html')) {
   initLoginPage();
 }
-
-// =============================================================
-// PAGE DASHBOARD
-// =============================================================
-if (path.endsWith('/admin/dashboard.html') || path.endsWith('/admin/dashboard')) {
+if (path.endsWith('/admin/dashboard.html')) {
   initDashboardPage();
 }
 
@@ -32,23 +29,15 @@ if (path.endsWith('/admin/dashboard.html') || path.endsWith('/admin/dashboard'))
 // LOGIN
 // =============================================================
 async function initLoginPage() {
-  const auth = await getFirebaseAuth();
+  const existingToken = getAdminToken();
+  if (existingToken) {
+    window.location.href = 'dashboard.html';
+    return;
+  }
+
   const form = document.getElementById('login-form');
   const errorEl = document.getElementById('login-error');
   const submitBtn = document.getElementById('login-submit');
-
-  // Si déjà connecté ET autorisé -> redirige
-  auth._onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      if (user.email === ADMIN_EMAIL) {
-        window.location.href = 'dashboard.html';
-      } else {
-        errorEl.textContent = window.i18n.t('admin.notAuthorized');
-        errorEl.classList.remove('hidden');
-        await auth._signOut(auth);
-      }
-    }
-  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -60,18 +49,22 @@ async function initLoginPage() {
     const password = document.getElementById('admin-password').value;
 
     try {
-      const cred = await auth._signIn(auth, email, password);
-      if (cred.user.email !== ADMIN_EMAIL) {
-        await auth._signOut(auth);
-        throw new Error('not_authorized');
+      const res = await fetch(`${WORKER_API_URL}/api/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
+
+      saveAdminSession(data.token, data.email, data.expires_at);
       window.location.href = 'dashboard.html';
     } catch (err) {
-      console.error(err);
-      const msg = err.message === 'not_authorized'
-        ? window.i18n.t('admin.notAuthorized')
-        : window.i18n.t('admin.loginError');
-      errorEl.textContent = msg;
+      console.error('Login error:', err);
+      errorEl.textContent = err.message || window.i18n.t('admin.loginError');
       errorEl.classList.remove('hidden');
       submitBtn.disabled = false;
       submitBtn.textContent = window.i18n.t('admin.signIn');
@@ -82,48 +75,34 @@ async function initLoginPage() {
 // =============================================================
 // DASHBOARD
 // =============================================================
-let _auth = null;
-let _currentUser = null;
-
 async function initDashboardPage() {
-  _auth = await getFirebaseAuth();
+  const token = getAdminToken();
+  if (!token) {
+    window.location.href = 'login.html';
+    return;
+  }
 
-  // Garde d'authentification
-  _auth._onAuthStateChanged(_auth, async (user) => {
-    if (!user) {
-      window.location.href = 'login.html';
-      return;
-    }
-    if (user.email !== ADMIN_EMAIL) {
-      await _auth._signOut(_auth);
-      window.location.href = 'login.html';
-      return;
-    }
-    _currentUser = user;
-    document.getElementById('admin-email-display').textContent = user.email;
-    await loadDashboardData();
-    bindDashboardEvents();
-  });
+  const email = getAdminEmail();
+  document.getElementById('admin-email-display').textContent = email || 'admin';
 
-  // Déconnexion
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    await _auth._signOut(_auth);
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    clearAdminSession();
     window.location.href = 'login.html';
   });
 
-  // Année footer
   document.getElementById('year').textContent = new Date().getFullYear();
+
+  await loadDashboardData();
+  bindDashboardEvents();
 }
 
-// Récupère un token Firebase ID frais pour les appels admin
-async function getIdToken() {
-  if (!_currentUser) throw new Error('Not authenticated');
-  return await _currentUser.getIdToken();
-}
-
-// Appel admin vers le Worker
 async function adminApi(path, options = {}) {
-  const token = await getIdToken();
+  const token = getAdminToken();
+  if (!token) {
+    clearAdminSession();
+    window.location.href = 'login.html';
+    throw new Error('Session expirée');
+  }
   const res = await fetch(`${WORKER_API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -132,6 +111,13 @@ async function adminApi(path, options = {}) {
     },
     ...options,
   });
+
+  if (res.status === 401 || res.status === 403) {
+    clearAdminSession();
+    window.location.href = 'login.html';
+    throw new Error('Session invalide');
+  }
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error((data && data.error) || `HTTP ${res.status}`);
@@ -139,7 +125,23 @@ async function adminApi(path, options = {}) {
   return data;
 }
 
-// Charge offres + transactions + stats
+// Upload d'image (multipart) — ne passe pas par adminApi car Content-Type différent
+async function uploadImage(file) {
+  const token = getAdminToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${WORKER_API_URL}/api/admin/upload-image`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error((data && data.error) || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
 async function loadDashboardData() {
   await Promise.all([loadOffers(), loadTransactions(), loadStats()]);
 }
@@ -151,7 +153,6 @@ async function loadStats() {
     document.getElementById('stat-total').textContent = stats.total ?? '—';
     document.getElementById('stat-approved').textContent = stats.approved ?? '—';
     document.getElementById('stat-pending').textContent = stats.pending ?? '—';
-    // CA par devise
     const revEl = document.getElementById('stat-revenue');
     if (stats.revenue && Object.keys(stats.revenue).length > 0) {
       revEl.innerHTML = Object.entries(stats.revenue)
@@ -182,7 +183,8 @@ function formatAdminPrice(amount, currency) {
 async function loadOffers() {
   const listEl = document.getElementById('offers-list');
   try {
-    const { offers } = await adminApi('/api/admin/offers');
+    const data = await adminApi('/api/admin/offers');
+    const offers = data.offers || data;
     listEl.innerHTML = '';
     if (offers.length === 0) {
       listEl.innerHTML = `<p style="color:var(--text-muted)">${window.i18n.t('home.empty')}</p>`;
@@ -205,7 +207,11 @@ function renderOfferRow(offer) {
   const typeLabel = window.i18n.t(
     offer.type === 'digital_product' ? 'admin.typeDigital' : 'admin.typeService'
   );
+  const cover = (offer.media_type === 'image' && Array.isArray(offer.media_images) && offer.media_images.length > 0)
+    ? `<img src="${escapeHtml(offer.media_images[0])}" class="ar-thumb" alt="" />`
+    : '';
   row.innerHTML = `
+    ${cover ? `<div class="ar-cover">${cover}</div>` : ''}
     <div class="ar-main">
       <div class="ar-title">${escapeHtml(title)} <span class="badge ${offer.is_active ? 'badge-active' : 'badge-inactive'}">${offer.is_active ? '●' : '○'}</span></div>
       <div class="ar-meta">${escapeHtml(typeLabel)} · ${formatAdminPrice(offer.price, offer.currency)}</div>
@@ -230,13 +236,22 @@ function renderOfferRow(offer) {
 }
 
 // ---------- Modale offre (création / édition) ----------
+// État temporaire pour les images uploadées (array d'URLs)
+let _currentMediaImages = [];
+
 function openOfferModal(offer = null) {
   const modal = document.getElementById('offer-modal');
   const form = document.getElementById('offer-form');
   form.reset();
   document.getElementById('offer-id').value = offer ? offer.id : '';
+  _currentMediaImages = [];
 
-  // Pré-remplissage
+  // Vide les listes dynamiques
+  ['highlights-fr', 'highlights-en', 'excerpts-fr', 'excerpts-en'].forEach((key) => {
+    const list = document.getElementById(`${key}-list`);
+    if (list) list.innerHTML = '';
+  });
+
   if (offer) {
     document.getElementById('offer-type').value = offer.type;
     document.getElementById('offer-title-fr').value = offer.title_fr || '';
@@ -245,22 +260,31 @@ function openOfferModal(offer = null) {
     document.getElementById('offer-desc-en').value = offer.description_en || '';
     document.getElementById('offer-price').value = offer.price || '';
     document.getElementById('offer-currency').value = offer.currency || 'XOF';
-    document.getElementById('offer-sales-link').value = offer.sales_link || '';
     document.getElementById('offer-active').checked = !!offer.is_active;
 
-    if (offer.type === 'digital_product') {
-      document.getElementById('offer-uuid').value = offer.uploadcare_uuid || '';
-      document.getElementById('offer-file-name').value = offer.file_name || '';
-      document.getElementById('offer-file-size').value = offer.file_size_bytes || '';
-      updateUploadcareInfo();
-    } else {
-      document.getElementById('offer-service-mode').value = offer.service_mode || 'instructions';
-      document.getElementById('offer-instructions-fr').value = offer.service_instructions_fr || '';
-      document.getElementById('offer-instructions-en').value = offer.service_instructions_en || '';
-      document.getElementById('offer-private-link').value = offer.service_private_link || '';
-      document.getElementById('offer-booking-link').value = offer.service_booking_link || '';
-      document.getElementById('offer-contact').value = offer.service_contact || '';
-    }
+    document.getElementById('offer-service-mode').value = offer.service_mode || 'instructions';
+    document.getElementById('offer-instructions-fr').value = offer.service_instructions_fr || '';
+    document.getElementById('offer-instructions-en').value = offer.service_instructions_en || '';
+    document.getElementById('offer-private-link').value = offer.service_private_link || '';
+    document.getElementById('offer-booking-link').value = offer.service_booking_link || '';
+    document.getElementById('offer-contact').value = offer.service_contact || '';
+
+    // Média
+    document.getElementById('offer-media-type').value = offer.media_type || '';
+    document.getElementById('offer-media-demo-url').value = offer.media_demo_url || '';
+    _currentMediaImages = Array.isArray(offer.media_images) ? [...offer.media_images] : [];
+    renderImagePreviews();
+
+    // Présentation
+    document.getElementById('offer-summary-fr').value = offer.presentation_summary_fr || '';
+    document.getElementById('offer-summary-en').value = offer.presentation_summary_en || '';
+
+    // Listes dynamiques
+    addDynamicRows('highlights-fr', offer.presentation_highlights_fr || [], 'text');
+    addDynamicRows('highlights-en', offer.presentation_highlights_en || [], 'text');
+    addDynamicRows('excerpts-fr', offer.presentation_excerpts_fr || [], 'excerpt');
+    addDynamicRows('excerpts-en', offer.presentation_excerpts_en || [], 'excerpt');
+
     const sl = offer.social_links || {};
     document.getElementById('offer-social-whatsapp').value = sl.whatsapp || '';
     document.getElementById('offer-social-telegram').value = sl.telegram || '';
@@ -268,46 +292,186 @@ function openOfferModal(offer = null) {
     document.getElementById('offer-social-instagram').value = sl.instagram || '';
   }
 
-  toggleOfferFields();
+  toggleMediaSections();
   modal.classList.remove('hidden');
 }
 
 function closeOfferModal() {
   document.getElementById('offer-modal').classList.add('hidden');
+  _currentMediaImages = [];
 }
 
-// Affiche/masque les champs selon le type d'offre
-function toggleOfferFields() {
-  const type = document.getElementById('offer-type').value;
-  document.getElementById('digital-fields').classList.toggle('hidden', type !== 'digital_product');
-  document.getElementById('service-fields').classList.toggle('hidden', type !== 'service');
+// Affiche/masque les sous-sections média selon le type choisi
+function toggleMediaSections() {
+  const mediaType = document.getElementById('offer-media-type').value;
+  document.getElementById('media-demo-section').classList.toggle('hidden', mediaType !== 'demo');
+  document.getElementById('media-image-section').classList.toggle('hidden', mediaType !== 'image');
 }
 
-// Met à jour l'affichage du fichier sélectionné
-function updateUploadcareInfo() {
-  const name = document.getElementById('offer-file-name').value;
-  const size = document.getElementById('offer-file-size').value;
-  const info = document.getElementById('uploadcare-info');
-  if (name) {
-    info.classList.remove('hidden');
-    info.innerHTML = `
-      <div class="uc-name">${escapeHtml(name)}</div>
-      <div class="uc-size">${window.i18n.t('admin.size')}: ${formatFileSize(size)}</div>
-    `;
-  } else {
-    info.classList.add('hidden');
+// =============================================================
+// Listes dynamiques (points forts + extraits)
+// =============================================================
+
+// Ajoute des rows existantes (édition)
+function addDynamicRows(listKey, items, type) {
+  const listEl = document.getElementById(`${listKey}-list`);
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  for (const item of items) {
+    if (type === 'text') {
+      addDynamicTextRow(listKey, item);
+    } else if (type === 'excerpt') {
+      addDynamicExcerptRow(listKey, item);
+    }
   }
 }
 
-function formatFileSize(bytes) {
-  const b = Number(bytes) || 0;
-  if (b < 1024) return `${b} B`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} MB`;
-  return `${(b / 1024 / 1024 / 1024).toFixed(2)} GB`;
+// Ajoute une row "texte simple" (points forts)
+function addDynamicTextRow(listKey, value = '') {
+  const listEl = document.getElementById(`${listKey}-list`);
+  const row = document.createElement('div');
+  row.className = 'dyn-row';
+  row.innerHTML = `
+    <input type="text" class="form-input dyn-input" value="${escapeHtml(value)}" placeholder="..." />
+    <button type="button" class="btn btn-danger btn-sm dyn-remove">×</button>
+  `;
+  row.querySelector('.dyn-remove').addEventListener('click', () => row.remove());
+  listEl.appendChild(row);
 }
 
-// ---------- Soumission formulaire offre ----------
+// Ajoute une row "extrait" (titre + contenu)
+function addDynamicExcerptRow(listKey, value = {}) {
+  const listEl = document.getElementById(`${listKey}-list`);
+  const row = document.createElement('div');
+  row.className = 'dyn-row dyn-row-excerpt';
+  row.innerHTML = `
+    <div class="dyn-excerpt-fields">
+      <input type="text" class="form-input dyn-excerpt-title" value="${escapeHtml(value.title || '')}" placeholder="Titre de l'extrait" />
+      <textarea class="form-input dyn-excerpt-content" rows="2" placeholder="Contenu de l'extrait...">${escapeHtml(value.content || '')}</textarea>
+    </div>
+    <button type="button" class="btn btn-danger btn-sm dyn-remove">×</button>
+  `;
+  row.querySelector('.dyn-remove').addEventListener('click', () => row.remove());
+  listEl.appendChild(row);
+}
+
+// Récupère les valeurs d'une liste dynamique
+function getDynamicValues(listKey, type) {
+  const listEl = document.getElementById(`${listKey}-list`);
+  if (!listEl) return [];
+  const rows = listEl.querySelectorAll('.dyn-row');
+  if (type === 'text') {
+    return Array.from(rows)
+      .map((r) => r.querySelector('.dyn-input')?.value.trim())
+      .filter((v) => v);
+  } else if (type === 'excerpt') {
+    return Array.from(rows)
+      .map((r) => ({
+        title: r.querySelector('.dyn-excerpt-title')?.value.trim() || '',
+        content: r.querySelector('.dyn-excerpt-content')?.value.trim() || '',
+      }))
+      .filter((e) => e.title || e.content);
+  }
+  return [];
+}
+
+// =============================================================
+// Upload d'images vers GitHub
+// =============================================================
+
+function setupImageUpload() {
+  const uploadBtn = document.getElementById('image-upload-btn');
+  const input = document.getElementById('image-input');
+  if (!uploadBtn || !input) return;
+
+  uploadBtn.addEventListener('click', () => input.click());
+  input.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    for (const file of files) {
+      await uploadOneImage(file);
+    }
+    input.value = ''; // reset pour permettre re-upload du même fichier
+  });
+
+  // Drag & drop
+  const zone = document.getElementById('image-upload-zone');
+  if (zone) {
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('image/'));
+      for (const file of files) {
+        await uploadOneImage(file);
+      }
+    });
+  }
+}
+
+async function uploadOneImage(file) {
+  // Ajoute une preview "uploading"
+  const previewList = document.getElementById('image-preview-list');
+  const previewItem = document.createElement('div');
+  previewItem.className = 'image-preview-item uploading';
+  previewItem.innerHTML = `
+    <div class="preview-thumb"><div class="spinner"></div></div>
+    <div class="preview-name">${escapeHtml(file.name)}</div>
+  `;
+  previewList.appendChild(previewItem);
+
+  try {
+    const result = await uploadImage(file);
+    _currentMediaImages.push(result.url);
+    previewItem.classList.remove('uploading');
+    previewItem.innerHTML = `
+      <img src="${escapeHtml(result.url)}" class="preview-thumb" alt="" />
+      <div class="preview-name">${escapeHtml(file.name)}</div>
+      <button type="button" class="btn btn-danger btn-sm preview-remove" data-url="${escapeHtml(result.url)}">×</button>
+    `;
+    previewItem.querySelector('.preview-remove').addEventListener('click', () => {
+      _currentMediaImages = _currentMediaImages.filter((u) => u !== result.url);
+      previewItem.remove();
+    });
+  } catch (err) {
+    console.error('Upload error:', err);
+    previewItem.classList.remove('uploading');
+    previewItem.classList.add('error');
+    previewItem.innerHTML = `
+      <div class="preview-thumb">✕</div>
+      <div class="preview-name">Échec: ${escapeHtml(err.message)}</div>
+      <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">×</button>
+    `;
+  }
+}
+
+function renderImagePreviews() {
+  const previewList = document.getElementById('image-preview-list');
+  if (!previewList) return;
+  previewList.innerHTML = '';
+  for (const url of _currentMediaImages) {
+    const item = document.createElement('div');
+    item.className = 'image-preview-item';
+    item.innerHTML = `
+      <img src="${escapeHtml(url)}" class="preview-thumb" alt="" />
+      <div class="preview-name">${escapeHtml(url.split('/').pop() || 'image')}</div>
+      <button type="button" class="btn btn-danger btn-sm preview-remove">×</button>
+    `;
+    item.querySelector('.preview-remove').addEventListener('click', () => {
+      _currentMediaImages = _currentMediaImages.filter((u) => u !== url);
+      item.remove();
+    });
+    previewList.appendChild(item);
+  }
+}
+
+// =============================================================
+// Soumission formulaire offre
+// =============================================================
 async function handleOfferSubmit(e) {
   e.preventDefault();
   const errorEl = document.getElementById('offer-form-error');
@@ -316,18 +480,39 @@ async function handleOfferSubmit(e) {
   saveBtn.disabled = true;
   saveBtn.textContent = window.i18n.t('admin.saving');
 
-  const type = document.getElementById('offer-type').value;
   const payload = {
     seller_id: 'florian',
-    type,
+    type: document.getElementById('offer-type').value,
     title_fr: document.getElementById('offer-title-fr').value.trim(),
     title_en: document.getElementById('offer-title-en').value.trim(),
     description_fr: document.getElementById('offer-desc-fr').value.trim(),
     description_en: document.getElementById('offer-desc-en').value.trim(),
     price: Number(document.getElementById('offer-price').value),
     currency: document.getElementById('offer-currency').value,
-    sales_link: document.getElementById('offer-sales-link').value.trim() || null,
     is_active: document.getElementById('offer-active').checked,
+
+    // Détails de l'offre
+    service_mode: document.getElementById('offer-service-mode').value,
+    service_instructions_fr: document.getElementById('offer-instructions-fr').value.trim(),
+    service_instructions_en: document.getElementById('offer-instructions-en').value.trim(),
+    service_private_link: document.getElementById('offer-private-link').value.trim() || null,
+    service_booking_link: document.getElementById('offer-booking-link').value.trim() || null,
+    service_contact: document.getElementById('offer-contact').value.trim() || null,
+
+    // Média
+    media_type: document.getElementById('offer-media-type').value || null,
+    media_demo_url: document.getElementById('offer-media-demo-url').value.trim() || null,
+    media_images: _currentMediaImages,
+
+    // Présentation
+    presentation_summary_fr: document.getElementById('offer-summary-fr').value.trim() || null,
+    presentation_summary_en: document.getElementById('offer-summary-en').value.trim() || null,
+    presentation_highlights_fr: getDynamicValues('highlights-fr', 'text'),
+    presentation_highlights_en: getDynamicValues('highlights-en', 'text'),
+    presentation_excerpts_fr: getDynamicValues('excerpts-fr', 'excerpt'),
+    presentation_excerpts_en: getDynamicValues('excerpts-en', 'excerpt'),
+
+    // Social
     social_links: {
       whatsapp: document.getElementById('offer-social-whatsapp').value.trim() || null,
       telegram: document.getElementById('offer-social-telegram').value.trim() || null,
@@ -335,27 +520,6 @@ async function handleOfferSubmit(e) {
       instagram: document.getElementById('offer-social-instagram').value.trim() || null,
     },
   };
-
-  // Champs spécifiques au type
-  if (type === 'digital_product') {
-    payload.uploadcare_uuid = document.getElementById('offer-uuid').value.trim();
-    payload.file_name = document.getElementById('offer-file-name').value.trim();
-    payload.file_size_bytes = Number(document.getElementById('offer-file-size').value) || 0;
-    if (!payload.uploadcare_uuid) {
-      errorEl.textContent = window.i18n.t('admin.noFile');
-      errorEl.classList.remove('hidden');
-      saveBtn.disabled = false;
-      saveBtn.textContent = window.i18n.t('admin.save');
-      return;
-    }
-  } else {
-    payload.service_mode = document.getElementById('offer-service-mode').value;
-    payload.service_instructions_fr = document.getElementById('offer-instructions-fr').value.trim();
-    payload.service_instructions_en = document.getElementById('offer-instructions-en').value.trim();
-    payload.service_private_link = document.getElementById('offer-private-link').value.trim() || null;
-    payload.service_booking_link = document.getElementById('offer-booking-link').value.trim() || null;
-    payload.service_contact = document.getElementById('offer-contact').value.trim() || null;
-  }
 
   try {
     const id = document.getElementById('offer-id').value;
@@ -377,37 +541,14 @@ async function handleOfferSubmit(e) {
   }
 }
 
-// ---------- Uploadcare widget ----------
-async function setupUploadcare() {
-  try {
-    const uploadcare = await loadUploadcareWidget();
-    // Configuration globale (clé publique uniquement)
-    if (window.UPLOADCARE_CONFIG) {
-      window.UPLOADCARE_CONFIG.publicKey = UPLOADCARE_PUBLIC_KEY;
-    } else {
-      window.UPLOADCARE_CONFIG = { publicKey: UPLOADCARE_PUBLIC_KEY, tabs: 'file url' };
-    }
-    const widget = uploadcare.Widget('[id=uploadcare-trigger]');
-    widget.on('uploadcomplete', (info) => {
-      // info est un objet fichier Uploadcare
-      const uuid = info.uuid;
-      const name = info.name;
-      const size = info.size;
-      document.getElementById('offer-uuid').value = uuid;
-      document.getElementById('offer-file-name').value = name;
-      document.getElementById('offer-file-size').value = size;
-      updateUploadcareInfo();
-    });
-  } catch (err) {
-    console.error('Uploadcare setup error', err);
-  }
-}
-
-// ---------- Transactions ----------
+// =============================================================
+// Transactions
+// =============================================================
 async function loadTransactions() {
   const body = document.getElementById('transactions-body');
   try {
-    const { transactions: txs } = await adminApi('/api/admin/transactions');
+    const data = await adminApi('/api/admin/transactions');
+    const txs = data.transactions || data;
     body.innerHTML = '';
     if (txs.length === 0) {
       body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">${window.i18n.t('admin.noTransactions')}</td></tr>`;
@@ -475,7 +616,6 @@ function bindDashboardEvents() {
       const target = tab.dataset.adminTab;
       const section = document.getElementById(`admin-${target}`);
       if (section) section.classList.remove('hidden');
-      // Force la visibilité de la première section via classe tab-content
       section.classList.add('tab-content-active');
     });
   });
@@ -488,14 +628,26 @@ function bindDashboardEvents() {
     el.addEventListener('click', closeOfferModal)
   );
 
-  // Changement de type -> affichage champs
-  document.getElementById('offer-type').addEventListener('change', toggleOfferFields);
+  // Changement type de média
+  document.getElementById('offer-media-type').addEventListener('change', toggleMediaSections);
+
+  // Boutons "+ ajouter" des listes dynamiques
+  document.querySelectorAll('[data-add]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.add;
+      if (key.startsWith('excerpts')) {
+        addDynamicExcerptRow(key, {});
+      } else {
+        addDynamicTextRow(key, '');
+      }
+    });
+  });
 
   // Soumission formulaire
   document.getElementById('offer-form').addEventListener('submit', handleOfferSubmit);
 
-  // Uploadcare
-  setupUploadcare();
+  // Upload images
+  setupImageUpload();
 
   // Rafraîchir transactions
   document.getElementById('refresh-tx-btn').addEventListener('click', () => {

@@ -31,13 +31,7 @@
     <main class="container main-content legal-main">
       <h1 data-i18n="legal.title">Informations légales</h1>
 
-      <div class="warning-box">
-        <strong data-i18n="legal.warningTitle">⚠️ Modèles à personnaliser</strong>
-        <p data-i18n="legal.warningText">
-          Les textes ci-dessous sont des modèles. Ils doivent être vérifiés et adaptés
-          par le vendeur avant la mise en ligne (statut juridique, SIRET, hébergeur, contact...).
-        </p>
-      </div>
+      
 
       <!-- Onglets -->
       <div class="tabs" role="tablist">
@@ -49,37 +43,48 @@
       <!-- Contenu : Mentions légales -->
       <section id="tab-mentions" class="legal-section tab-content tab-content-active">
         <h2 data-i18n="legal.mentionsTitle">Mentions légales</h2>
-        <p data-i18n="legal.mentionsOwner">Éditeur du site : Florian (à compléter : raison sociale, SIRET, adresse).</p>
-        <p data-i18n="legal.mentionsContact">Contact : <a href="mailto:contact@beta-arsenal.com">contact@beta-arsenal.com</a> (à personnaliser).</p>
-        <p data-i18n="legal.mentionsHost">Hébergement : Cloudflare, Inc. (et Firebase / Uploadcare pour les données et fichiers).</p>
+        <p data-i18n="legal.mentionsOwner">Éditeur du site : Florian BOKO, entrepreneur individuel (particulier), Bénin. Adresse disponible sur demande auprès du contact ci-dessous.</p>
+        <p data-i18n="legal.mentionsContact">Contact : <a href="mailto:bokoflorian24@gmail.com">bokoflorian24@gmail.com</a></p>
+        <p data-i18n="legal.mentionsHost">Hébergement du site : Cloudflare, Inc. (Pages, Workers, D1) et GitHub pour les images produits.</p>
+        <p data-i18n="legal.mentionsPayment">
+          Paiement et vente : les transactions (paiement, facturation, livraison des accès) sont intégralement gérées par
+          <strong>Chariow</strong>, plateforme tierce de vente en ligne. Bêta Arsenal n'est qu'une vitrine présentant le catalogue ;
+          tout achat redirige vers Chariow, qui traite le paiement et délivre le produit selon ses propres conditions.
+        </p>
         <p data-i18n="legal.mentionsResponsability">
-          Responsabilité : les informations présentées sont indicatives. Le vendeur s'efforce d'assurer
-          leur exactitude mais ne saurait être tenu responsable d'erreurs ou d'indisponibilités temporaires.
+          Responsabilité : les informations présentées sur ce site sont indicatives. Le vendeur s'efforce d'assurer
+          leur exactitude mais ne saurait être tenu responsable d'erreurs, d'indisponibilités temporaires du site,
+          ou de dysfonctionnements imputables à Chariow ou à tout autre prestataire tiers.
         </p>
       </section>
 
       <!-- Contenu : CGV -->
       <section id="tab-cgv" class="legal-section tab-content">
         <h2 data-i18n="legal.cgvTitle">Conditions Générales de Vente</h2>
-        <p data-i18n="legal.cgvScope">Les présentes CGV s'appliquent à toute commande passée sur ce site.</p>
+        <p data-i18n="legal.cgvScope">Les présentes CGV s'appliquent à toute commande passée depuis ce site et finalisée sur Chariow.</p>
         <p data-i18n="legal.cgvProducts">
           Produits et services : le vendeur commercialise des produits numériques (livraison immédiate
-          après paiement) et des services (accès selon les modalités indiquées sur l'offre).
+          après paiement) et, le cas échéant, des services (accès selon les modalités indiquées sur l'offre).
+          Bêta Arsenal présente le catalogue ; la commande elle-même est passée sur Chariow.
         </p>
         <p data-i18n="legal.cgvPrice">
-          Prix : les prix sont indiqués dans la devise de l'offre. Le paiement est sécurisé via FedaPay.
+          Prix et paiement : les prix sont indiqués dans la devise de l'offre. Le paiement est traité intégralement
+          par <strong>Chariow</strong>, qui sécurise la transaction (le vendeur n'a accès à aucune donnée bancaire).
         </p>
         <p data-i18n="legal.cgvDelivery">
-          Livraison : pour les produits numériques, un lien de téléchargement temporaire est fourni
-          après confirmation du paiement. Pour les services, les instructions sont affichées sur la page de confirmation.
+          Livraison : pour les produits numériques, l'accès ou le lien de téléchargement est fourni directement
+          par Chariow après confirmation du paiement. Pour les services, les instructions sont communiquées
+          sur la page de confirmation de Chariow ou par email.
         </p>
         <p data-i18n="legal.cgvRefund">
           Remboursement : compte tenu de la nature numérique des biens, aucun remboursement n'est accordé
-          après téléchargement, sauf dysfonctionnement technique avéré. Pour les services, se référer aux
-          conditions spécifiques de chaque offre.
+          après téléchargement ou accès au produit, sauf dysfonctionnement technique avéré. Toute demande de
+          remboursement doit être adressée au vendeur (voir contact) ; les délais de traitement des remboursements
+          peuvent dépendre des conditions propres à Chariow.
         </p>
         <p data-i18n="legal.cgvLaw">
-          Droit applicable : les présentes CGV sont soumises au droit applicable dans le pays du vendeur (à préciser).
+          Droit applicable : les présentes CGV sont soumises au droit béninois. En cas de litige, une solution amiable
+          sera recherchée en priorité avant toute autre démarche.
         </p>
       </section>
 
@@ -87,22 +92,28 @@
       <section id="tab-privacy" class="legal-section tab-content">
         <h2 data-i18n="legal.privacyTitle">Politique de confidentialité</h2>
         <p data-i18n="legal.privacyData">
-          Données collectées : email de l'acheteur (pour la livraison et le reçu). Aucune donnée bancaire
-          n'est stockée sur ce site (traitement externe par FedaPay).
+          Données collectées : ce site (Bêta Arsenal) ne collecte lui-même aucune donnée personnelle liée à l'achat.
+          Lors d'une commande, vos données (email, informations de paiement) sont saisies directement sur
+          <strong>Chariow</strong>, qui les traite selon sa propre politique de confidentialité. Aucune donnée
+          bancaire ne transite ni n'est stockée sur ce site.
         </p>
         <p data-i18n="legal.privacyStorage">
-          Stockage : les données sont hébergées sur Firebase (Firestore) et Cloudflare. Les fichiers numériques
-          sont stockés sur Uploadcare.
+          Stockage : le site lui-même (catalogue, contenu) est hébergé sur Cloudflare (Pages, Workers, D1). Les images
+          produits sont stockées sur GitHub (dépôt public). Les données liées aux commandes et aux paiements sont
+          stockées et gérées par Chariow, en dehors de l'infrastructure de ce site.
         </p>
         <p data-i18n="legal.privacyRetention">
-          Conservation : les données de transaction sont conservées pour la gestion des commandes et les obligations comptables.
+          Conservation : le vendeur ne conserve pas de base de données clients propre. Les données de transaction
+          sont conservées par Chariow selon ses propres règles et obligations légales.
         </p>
         <p data-i18n="legal.privacyRights">
-          Vos droits : vous pouvez demander l'accès, la rectification ou la suppression de vos données
-          en écrivant à l'éditeur (voir mentions légales).
+          Vos droits : pour toute question sur vos données de transaction, adressez-vous en priorité à Chariow.
+          Vous pouvez également écrire à l'éditeur de ce site (voir mentions légales) pour toute donnée qui
+          le concernerait directement.
         </p>
         <p data-i18n="legal.privacyCookies">
-          Cookies : ce site utilise le stockage local (localStorage) uniquement pour mémoriser la langue préférée.
+          Cookies : ce site utilise le stockage local (localStorage) du navigateur uniquement pour mémoriser la
+          langue préférée. Aucun cookie de suivi ou publicitaire n'est utilisé sur ce site.
         </p>
       </section>
     </main>

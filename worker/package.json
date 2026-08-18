@@ -1,14 +1,19 @@
 {
   "name": "beta-arsenal-api",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Backend sécurisé Bêta Arsenal (Cloudflare Workers ESM)",
+  "description": "Backend sécurisé Bêta Arsenal (Cloudflare Workers ESM + D1 + auth maison)",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --local",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "db:create": "wrangler d1 create beta-arsenal",
+    "db:migrate:local": "wrangler d1 migrations apply beta-arsenal --local",
+    "db:migrate:remote": "wrangler d1 migrations apply beta-arsenal --remote",
+    "db:query:local": "wrangler d1 execute beta-arsenal --local --command",
+    "db:query:remote": "wrangler d1 execute beta-arsenal --remote --command"
   },
   "devDependencies": {
     "wrangler": "^3.78.0"

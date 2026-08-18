@@ -1,33 +1,41 @@
 // =============================================================
-// Bêta Arsenal - Script de seed Firestore
+// Bêta Arsenal - Script de seed Cloudflare D1
 // -------------------------------------------------------------
-// Crée 3 offres fictives (1 produit numérique + 1 service RDV +
-// 1 service lien privé) dans la collection `offers`.
+// Crée :
+//   1. Le compte admin bootstrappé (hash PBKDF2-SHA256 600k itérations)
+//   2. 3 offres fictives (1 produit numérique + 1 service RDV +
+//      1 service lien privé/groupe)
+//
+// Le script génère scripts/seed.sql puis l'exécute via
+// `wrangler d1 execute` (local par défaut, --remote pour la prod).
 //
 // Utilisation :
-//   1. cp .env.example .env  (renseignez FIREBASE_PROJECT_ID,
-//      FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)
-//   2. node scripts/seed.mjs
+//   1. cp .env.example .env  (renseignez ADMIN_BOOTSTRAP_EMAIL,
+//      ADMIN_BOOTSTRAP_PASSWORD, JWT_SECRET)
+//   2. node scripts/seed.mjs            (base locale)
+//   3. node scripts/seed.mjs --remote   (base distante)
 //
-// Dépendances : Node.js 18+ (fetch global, crypto natif). Aucun paquet
-// externe requis : on lit .env manuellement et on signe le JWT avec
-// node:crypto.
+// Dépendances : Node.js 18+ (crypto natif). Aucun paquet externe.
 // =============================================================
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PBKDF2_ITERATIONS = 600000;
+const PBKDF2_KEYLEN = 32;
+const SALT_LEN = 16;
 
 // -------------------------------------------------------------
-// Lecture manuelle du fichier .env (pas de dépendance dotenv)
+// Lecture manuelle du fichier .env
 // -------------------------------------------------------------
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
   if (!fs.existsSync(envPath)) {
-    console.error('❌ Aucun fichier .env trouvé. Copiez .env.example vers .env et renseignez les valeurs Firebase.');
+    console.error('❌ Aucun fichier .env trouvé. Copiez .env.example vers .env et renseignez les valeurs.');
     process.exit(1);
   }
   const content = fs.readFileSync(envPath, 'utf-8');
@@ -39,7 +47,6 @@ function loadEnv() {
     if (eqIdx === -1) continue;
     const key = trimmed.slice(0, eqIdx).trim();
     let value = trimmed.slice(eqIdx + 1).trim();
-    // Retire les guillemets englobants
     if ((value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
@@ -50,118 +57,65 @@ function loadEnv() {
 }
 
 const env = loadEnv();
+const useRemote = process.argv.includes('--remote');
+const dbName = env.D1_DATABASE_NAME || 'beta-arsenal';
 
-const PROJECT_ID = env.FIREBASE_PROJECT_ID;
-const CLIENT_EMAIL = env.FIREBASE_CLIENT_EMAIL;
-const PRIVATE_KEY = env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+const ADMIN_EMAIL = env.ADMIN_BOOTSTRAP_EMAIL;
+const ADMIN_PASSWORD = env.ADMIN_BOOTSTRAP_PASSWORD;
 
-if (!PROJECT_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
-  console.error('❌ Variables Firebase manquantes dans .env (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).');
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.error('❌ ADMIN_BOOTSTRAP_EMAIL et ADMIN_BOOTSTRAP_PASSWORD doivent être définis dans .env');
+  process.exit(1);
+}
+if (ADMIN_PASSWORD.length < 8) {
+  console.error('❌ Le mot de passe admin doit faire au moins 8 caractères.');
   process.exit(1);
 }
 
-const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-
 // -------------------------------------------------------------
-// Signature RS256 du JWT du compte de service
+// Hash PBKDF2-SHA256 (compatible Worker crypto.subtle.deriveBits)
 // -------------------------------------------------------------
-function base64url(input) {
-  return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function createServiceAccountJwt() {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const payload = {
-    iss: CLIENT_EMAIL,
-    scope: 'https://www.googleapis.com/auth/datastore',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
-  };
-  const signingInput = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(payload))}`;
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(signingInput);
-  const signature = sign.sign(PRIVATE_KEY, 'base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `${signingInput}.${signature}`;
-}
-
-async function getAccessToken() {
-  const jwt = createServiceAccountJwt();
-  const resp = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-  });
-  if (!resp.ok) {
-    throw new Error(`Erreur OAuth2: ${resp.status} ${await resp.text()}`);
-  }
-  const data = await resp.json();
-  return data.access_token;
+// Format stocké : pbkdf2$<iterations>$<salt_hex>$<hash_hex>
+function hashPassword(password) {
+  const salt = crypto.randomBytes(SALT_LEN);
+  const hash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, 'sha256');
+  return ['pbkdf2', String(PBKDF2_ITERATIONS), salt.toString('hex'), hash.toString('hex')].join('$');
 }
 
 // -------------------------------------------------------------
-// Conversion JS -> Firestore
+// Échappement SQL (sécurité : ne jamais interpoler de valeurs
+// brutes dans une requête SQL générée)
 // -------------------------------------------------------------
-function toFirestoreValue(value) {
-  if (value === null || value === undefined) return { nullValue: null };
-  if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-  }
-  if (typeof value === 'string') return { stringValue: value };
-  if (value instanceof Date) return { timestampValue: value.toISOString() };
-  if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
-  if (typeof value === 'object') {
-    const fields = {};
-    for (const [k, v] of Object.entries(value)) {
-      if (v !== undefined) fields[k] = toFirestoreValue(v);
-    }
-    return { mapValue: { fields } };
-  }
-  return { nullValue: null };
-}
-
-function toFirestoreDocument(obj) {
-  const fields = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined) fields[k] = toFirestoreValue(v);
-  }
-  return { fields };
-}
-
-async function createOffer(token, data) {
-  const url = `${FIRESTORE_BASE}/offers`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(toFirestoreDocument(data)),
-  });
-  if (!resp.ok) {
-    throw new Error(`Erreur création offre: ${resp.status} ${await resp.text()}`);
-  }
-  return resp.json();
+function sqlEscape(str) {
+  if (str === null || str === undefined) return 'NULL';
+  return "'" + String(str).replace(/'/g, "''") + "'";
 }
 
 // -------------------------------------------------------------
-// Données de seed : 3 offres
+// Génération du SQL
 // -------------------------------------------------------------
-async function main() {
-  console.log('🔐 Obtention du token Google...');
-  const token = await getAccessToken();
-
+function generateSeedSql() {
   const now = new Date().toISOString();
+  const passwordHash = hashPassword(ADMIN_PASSWORD);
 
+  // IDs UUID v4 pour les offres
+  const offerIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+
+  const lines = [];
+
+  // 1. Compte admin (INSERT OR IGNORE pour ne pas écraser un admin existant)
+  lines.push('-- Compte admin bootstrappé');
+  lines.push(
+    `INSERT OR IGNORE INTO admin_users (email, password_hash, created_at) ` +
+    `VALUES (${sqlEscape(ADMIN_EMAIL.toLowerCase())}, ${sqlEscape(passwordHash)}, ${sqlEscape(now)});`
+  );
+  lines.push('');
+
+  // 2. Offres (INSERT OR REPLACE pour pouvoir re-seeder)
+  // V3 : formulaire unifié + média (démo TikTok OU images) + présentation
   const offers = [
-    // 1. Produit numérique (PDF guide)
     {
-      seller_id: 'florian',
+      id: offerIds[0],
       type: 'digital_product',
       title_fr: 'Guide PDF : Lancer son business digital',
       title_en: 'PDF Guide: Launch your digital business',
@@ -169,21 +123,43 @@ async function main() {
       description_en: 'A complete 60-page guide to start an online business from scratch. Instant delivery after payment.',
       price: 5000,
       currency: 'XOF',
-      is_active: true,
-      uploadcare_uuid: '00000000-0000-0000-0000-000000000000',
-      file_name: 'guide-business-digital.pdf',
-      file_size_bytes: 2400000,
-      sales_link: 'https://systeme.io/votre-tunnel-de-vente',
-      social_links: {
-        whatsapp: 'https://wa.me/22500000000',
-        telegram: 'https://t.me/betaarsenal',
-      },
-      created_at: now,
-      updated_at: now,
+      // Détails de l'offre
+      service_mode: 'private_link',
+      service_instructions_fr: "Après votre paiement, vous serez redirigé vers le site annexe où vous pourrez télécharger votre guide PDF.",
+      service_instructions_en: 'After your payment, you will be redirected to the external site where you can download your PDF guide.',
+      service_private_link: 'https://example.com/tunnel-vente-guide-pdf',
+      // Média : démo TikTok
+      media_type: 'demo',
+      media_demo_url: 'https://www.tiktok.com/@betaarsenal/video/7123456789012345678',
+      // Présentation
+      presentation_summary_fr: "Ce guide de 60 pages est le fruit de 3 années d'expérience en business digital. Il couvre toutes les étapes : idée, validation, création du produit, marketing, vente, et livraison automatisée. Inclus : 5 templates prêts à l'emploi, 3 checklists, et l'accès à une communauté privée.",
+      presentation_summary_en: "This 60-page guide is the result of 3 years of digital business experience. It covers every step: idea, validation, product creation, marketing, sales, and automated delivery. Includes: 5 ready-to-use templates, 3 checklists, and access to a private community.",
+      presentation_highlights_fr: [
+        '60 pages de contenu actionnable',
+        '5 templates prêts à l\'emploi',
+        '3 checklists de validation',
+        'Accès communauté privée Discord',
+        'Mises à jour à vie incluses',
+      ],
+      presentation_highlights_en: [
+        '60 pages of actionable content',
+        '5 ready-to-use templates',
+        '3 validation checklists',
+        'Private Discord community access',
+        'Lifetime updates included',
+      ],
+      presentation_excerpts_fr: [
+        { title: 'Chapitre 1 : Trouver son idée', content: "La plupart des entrepreneurs bloquent à cette étape. Je vous partage ma méthode en 3 questions pour identifier une idée rentable en moins de 30 minutes." },
+        { title: 'Chapitre 4 : Le système de vente', content: "Un tunnel de vente simple en 3 pages : page d\'atterrissage, page de paiement, page de remerciement. Modèle inclus." },
+      ],
+      presentation_excerpts_en: [
+        { title: 'Chapter 1: Finding your idea', content: "Most entrepreneurs get stuck at this step. I share my 3-question method to identify a profitable idea in under 30 minutes." },
+        { title: 'Chapter 4: The sales system', content: "A simple 3-page sales funnel: landing page, checkout page, thank you page. Template included." },
+      ],
+      social_links: { whatsapp: 'https://wa.me/22500000000', telegram: 'https://t.me/betaarsenal' },
     },
-    // 2. Service de type RDV
     {
-      seller_id: 'florian',
+      id: offerIds[1],
       type: 'service',
       title_fr: 'Coaching individuel (1h en visio)',
       title_en: 'Individual coaching (1h video call)',
@@ -191,23 +167,43 @@ async function main() {
       description_en: 'One hour of personalized video coaching. Booking link sent after purchase.',
       price: 15000,
       currency: 'XOF',
-      is_active: true,
       service_mode: 'rdv',
-      service_instructions_fr: 'Après votre achat, utilisez le lien de réservation pour choisir votre créneau. Vous recevrez un email de confirmation avec le lien de la visio.',
+      service_instructions_fr: "Après votre achat, utilisez le lien de réservation pour choisir votre créneau. Vous recevrez un email de confirmation avec le lien de la visio.",
       service_instructions_en: 'After your purchase, use the booking link to choose your slot. You will receive a confirmation email with the video call link.',
-      service_private_link: null,
       service_booking_link: 'https://calendly.com/beta-arsenal/coaching',
       service_contact: 'https://wa.me/22500000000',
-      sales_link: 'https://systeme.io/votre-tunnel-de-vente',
-      social_links: {
-        whatsapp: 'https://wa.me/22500000000',
-      },
-      created_at: now,
-      updated_at: now,
+      // Média : images (placeholders GitHub — à remplacer par de vraies images uploadées)
+      media_type: 'image',
+      media_images: [
+        'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800',
+        'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800',
+      ],
+      presentation_summary_fr: "Un coaching 1-to-1 d'une heure pour faire le point sur votre business digital. On analysera votre situation actuelle, on identifiera les points de blocage, et on construira ensemble un plan d'action sur 30 jours.",
+      presentation_summary_en: "A 1-to-1 one-hour coaching session to review your digital business. We'll analyze your current situation, identify bottlenecks, and build a 30-day action plan together.",
+      presentation_highlights_fr: [
+        '1h de visio personnalisée',
+        'Analyse complète de votre situation',
+        'Plan d\'action sur 30 jours',
+        'Suivi par email pendant 7 jours',
+        'Replay de la session fourni',
+      ],
+      presentation_highlights_en: [
+        '1h personalized video call',
+        'Complete situation analysis',
+        '30-day action plan',
+        'Email follow-up for 7 days',
+        'Session replay provided',
+      ],
+      presentation_excerpts_fr: [
+        { title: 'Déroulé de la séance', content: "1. Tour de table (10 min)\n2. Analyse de votre situation (20 min)\n3. Identification des priorités (15 min)\n4. Plan d'action (15 min)" },
+      ],
+      presentation_excerpts_en: [
+        { title: 'Session outline', content: "1. Introduction (10 min)\n2. Situation analysis (20 min)\n3. Priority identification (15 min)\n4. Action plan (15 min)" },
+      ],
+      social_links: { whatsapp: 'https://wa.me/22500000000' },
     },
-    // 3. Service de type lien privé / groupe
     {
-      seller_id: 'florian',
+      id: offerIds[2],
       type: 'service',
       title_fr: 'Accès groupe privé Telegram (mensuel)',
       title_en: 'Private Telegram group access (monthly)',
@@ -215,33 +211,112 @@ async function main() {
       description_en: 'Join a private Telegram group with exclusive content and daily chats for 1 month.',
       price: 3000,
       currency: 'XOF',
-      is_active: true,
       service_mode: 'private_group',
-      service_instructions_fr: 'Après votre achat, cliquez sur le lien privé pour rejoindre le groupe Telegram. L\'accès est valable 30 jours.',
+      service_instructions_fr: "Après votre achat, cliquez sur le lien privé pour rejoindre le groupe Telegram. L'accès est valable 30 jours.",
       service_instructions_en: 'After your purchase, click the private link to join the Telegram group. Access is valid for 30 days.',
       service_private_link: 'https://t.me/+abcdef123456',
-      service_booking_link: null,
       service_contact: 'https://t.me/betaarsenal',
-      sales_link: 'https://systeme.io/votre-tunnel-de-vente',
-      social_links: {
-        telegram: 'https://t.me/betaarsenal',
-      },
-      created_at: now,
-      updated_at: now,
+      // Média : démo TikTok
+      media_type: 'demo',
+      media_demo_url: 'https://www.tiktok.com/@betaarsenal/video/7234567890123456789',
+      presentation_summary_fr: "Un groupe Telegram privé où je partage chaque jour mes analyses, mes coulisses, et où vous pouvez poser vos questions. Accès mensuel renouvelable.",
+      presentation_summary_en: "A private Telegram group where I share daily analyses, behind-the-scenes content, and where you can ask your questions. Renewable monthly access.",
+      presentation_highlights_fr: [
+        'Contenu exclusif quotidien',
+        'Questions-réponses en direct',
+        'Partage de coulisses',
+        'Accès aux outils que j\'utilise',
+        'Communauté d\'entrepreneurs',
+      ],
+      presentation_highlights_en: [
+        'Daily exclusive content',
+        'Live Q&A',
+        'Behind-the-scenes sharing',
+        'Access to my tools stack',
+        'Community of entrepreneurs',
+      ],
+      presentation_excerpts_fr: [],
+      presentation_excerpts_en: [],
+      social_links: { telegram: 'https://t.me/betaarsenal' },
     },
   ];
 
-  console.log(`🌱 Création de ${offers.length} offres dans Firestore...`);
-  for (const offer of offers) {
-    const created = await createOffer(token, offer);
-    const id = created.name.split('/').pop();
-    console.log(`  ✅ Offre créée : ${offer.title_fr} (id=${id})`);
+  lines.push('-- Offres fictives (INSERT OR REPLACE pour permettre le re-seed)');
+  for (const o of offers) {
+    const cols = [
+      'id', 'seller_id', 'type', 'title_fr', 'title_en', 'description_fr', 'description_en',
+      'price', 'currency', 'is_active',
+      'service_mode', 'service_instructions_fr', 'service_instructions_en',
+      'service_private_link', 'service_booking_link', 'service_contact',
+      'media_type', 'media_demo_url', 'media_images',
+      'presentation_summary_fr', 'presentation_summary_en',
+      'presentation_highlights_fr', 'presentation_highlights_en',
+      'presentation_excerpts_fr', 'presentation_excerpts_en',
+      'social_links', 'created_at', 'updated_at',
+    ];
+    const vals = [
+      sqlEscape(o.id), sqlEscape('florian'), sqlEscape(o.type),
+      sqlEscape(o.title_fr), sqlEscape(o.title_en),
+      sqlEscape(o.description_fr), sqlEscape(o.description_en),
+      Number(o.price), sqlEscape(o.currency), 1,
+      o.service_mode ? sqlEscape(o.service_mode) : 'NULL',
+      o.service_instructions_fr ? sqlEscape(o.service_instructions_fr) : 'NULL',
+      o.service_instructions_en ? sqlEscape(o.service_instructions_en) : 'NULL',
+      o.service_private_link ? sqlEscape(o.service_private_link) : 'NULL',
+      o.service_booking_link ? sqlEscape(o.service_booking_link) : 'NULL',
+      o.service_contact ? sqlEscape(o.service_contact) : 'NULL',
+      o.media_type ? sqlEscape(o.media_type) : 'NULL',
+      o.media_demo_url ? sqlEscape(o.media_demo_url) : 'NULL',
+      sqlEscape(JSON.stringify(o.media_images || [])),
+      o.presentation_summary_fr ? sqlEscape(o.presentation_summary_fr) : 'NULL',
+      o.presentation_summary_en ? sqlEscape(o.presentation_summary_en) : 'NULL',
+      sqlEscape(JSON.stringify(o.presentation_highlights_fr || [])),
+      sqlEscape(JSON.stringify(o.presentation_highlights_en || [])),
+      sqlEscape(JSON.stringify(o.presentation_excerpts_fr || [])),
+      sqlEscape(JSON.stringify(o.presentation_excerpts_en || [])),
+      sqlEscape(JSON.stringify(o.social_links || {})),
+      sqlEscape(now), sqlEscape(now),
+    ];
+    lines.push(
+      `INSERT OR REPLACE INTO offers (${cols.join(', ')}) VALUES (${vals.join(', ')});`
+    );
   }
 
-  console.log('\n🎉 Seed terminé ! Vos offres sont visibles dans Firestore et sur le catalogue public.');
+  return lines.join('\n') + '\n';
 }
 
-main().catch((err) => {
-  console.error('❌ Erreur seed:', err);
-  process.exit(1);
-});
+// -------------------------------------------------------------
+// Exécution via wrangler d1 execute
+// -------------------------------------------------------------
+function main() {
+  const sql = generateSeedSql();
+  const sqlPath = path.join(__dirname, 'seed.sql');
+  fs.writeFileSync(sqlPath, sql, 'utf-8');
+  console.log(`📝 Fichier SQL généré : ${sqlPath}`);
+
+  const flag = useRemote ? '--remote' : '--local';
+  const cmd = `npx wrangler d1 execute ${dbName} ${flag} --file="${sqlPath}"`;
+
+  console.log(`\n🚀 Exécution : ${cmd}`);
+  console.log(`   (base ${useRemote ? 'DISTANTE' : 'LOCALE'})\n`);
+
+  try {
+    execSync(cmd, { stdio: 'inherit', cwd: path.join(__dirname, '..', 'worker') });
+    console.log('\n✅ Seed terminé avec succès !');
+    console.log(`   Compte admin : ${ADMIN_EMAIL}`);
+    console.log(`   Mot de passe : ${'*'.repeat(ADMIN_PASSWORD.length)} (configuré dans .env)`);
+    console.log(`   3 offres créées dans la base D1.`);
+    if (!useRemote) {
+      console.log('\n💡 Pour seed la base de production : node scripts/seed.mjs --remote');
+    }
+  } catch (err) {
+    console.error('\n❌ Erreur lors de l\'exécution du seed.');
+    console.error('   Vérifiez que :');
+    console.error('   - wrangler.toml contient le bon database_id D1');
+    console.error('   - la migration 0001_init.sql a été appliquée');
+    console.error('     (cd worker && npm run db:migrate:local)');
+    process.exit(1);
+  }
+}
+
+main();

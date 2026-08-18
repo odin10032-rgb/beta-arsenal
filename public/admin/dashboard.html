@@ -11,7 +11,6 @@
 </head>
 <body>
   <div class="app-shell">
-    <!-- ============ HEADER ADMIN ============ -->
     <header class="site-header">
       <div class="container header-inner">
         <a href="/" class="brand">
@@ -31,7 +30,6 @@
     <main class="container main-content">
       <h1 class="dashboard-title" data-i18n="admin.dashboard">Tableau de bord</h1>
 
-      <!-- ============ STATISTIQUES ============ -->
       <section class="stats-grid" aria-label="Statistiques">
         <div class="stat-card">
           <div class="stat-label" data-i18n="admin.statTotal">Ventes totales</div>
@@ -51,13 +49,11 @@
         </div>
       </section>
 
-      <!-- ============ ONGLETS ============ -->
       <div class="tabs" role="tablist">
         <button class="tab tab-active" role="tab" data-admin-tab="offers" data-i18n="admin.tabOffers">Offres</button>
         <button class="tab" role="tab" data-admin-tab="transactions" data-i18n="admin.tabTransactions">Transactions</button>
       </div>
 
-      <!-- ============ SECTION OFFRES ============ -->
       <section id="admin-offers" class="admin-section tab-content tab-content-active">
         <div class="section-head">
           <h2 data-i18n="admin.offersTitle">Gestion des offres</h2>
@@ -69,7 +65,6 @@
         </div>
       </section>
 
-      <!-- ============ SECTION TRANSACTIONS ============ -->
       <section id="admin-transactions" class="admin-section tab-content hidden">
         <div class="section-head">
           <h2 data-i18n="admin.transactionsTitle">Transactions</h2>
@@ -100,10 +95,10 @@
     </footer>
   </div>
 
-  <!-- ============ MODALE FORMULAIRE OFFRE ============ -->
+  <!-- ============ MODALE FORMULAIRE OFFRE (unifié + média + présentation) ============ -->
   <div id="offer-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="offer-modal-title">
     <div class="modal-backdrop" data-close-offer-modal></div>
-    <div class="modal-card modal-card-wide">
+    <div class="modal-card modal-card-wide scroll-area">
       <button class="modal-close" data-close-offer-modal aria-label="Fermer">×</button>
       <h2 id="offer-modal-title" data-i18n="admin.offerFormTitle">Offre</h2>
 
@@ -126,10 +121,10 @@
 
         <!-- Descriptions -->
         <label class="form-label" data-i18n="admin.descFr">Description (FR)</label>
-        <textarea id="offer-desc-fr" class="form-input" rows="3" required></textarea>
+        <textarea id="offer-desc-fr" class="form-input" rows="2" required></textarea>
 
         <label class="form-label" data-i18n="admin.descEn">Description (EN)</label>
-        <textarea id="offer-desc-en" class="form-input" rows="3" required></textarea>
+        <textarea id="offer-desc-en" class="form-input" rows="2" required></textarea>
 
         <!-- Prix & devise -->
         <div class="form-row">
@@ -149,57 +144,113 @@
           </div>
         </div>
 
-        <!-- Lien de paiement externe (Tunnel de vente) -->
-        <label class="form-label">Lien de paiement externe (Tunnel de vente)</label>
-        <input id="offer-sales-link" type="url" class="form-input" placeholder="https://..." required />
-
         <!-- Actif -->
         <label class="checkbox-row">
           <input id="offer-active" type="checkbox" checked />
           <span data-i18n="admin.isActive">Offre active (visible publiquement)</span>
         </label>
 
-        <!-- ============ Champs produit numérique ============ -->
-        <fieldset id="digital-fields" class="fieldset">
-          <legend data-i18n="admin.digitalLegend">Fichier numérique</legend>
-          <button type="button" id="uploadcare-trigger" class="btn btn-secondary">
-            <span data-i18n="admin.chooseFile">Choisir un fichier (Uploadcare)</span>
-          </button>
-          <div id="uploadcare-info" class="uploadcare-info hidden"></div>
-          <input type="hidden" id="offer-uuid" />
-          <input type="hidden" id="offer-file-name" />
-          <input type="hidden" id="offer-file-size" />
-        </fieldset>
+        <!-- ============ Détails de l'offre (commun aux deux types) ============ -->
+        <fieldset class="fieldset">
+          <legend data-i18n="admin.detailsLegend">Détails de l'offre</legend>
 
-        <!-- ============ Champs service ============ -->
-        <fieldset id="service-fields" class="fieldset hidden">
-          <legend data-i18n="admin.serviceLegend">Configuration du service</legend>
-
-          <label class="form-label" data-i18n="admin.serviceMode">Mode de service</label>
+          <label class="form-label" data-i18n="admin.serviceMode">Mode de livraison</label>
           <select id="offer-service-mode" class="form-input">
             <option value="instructions" data-i18n="admin.modeInstructions">Instructions simples</option>
             <option value="rdv" data-i18n="admin.modeRdv">Rendez-vous</option>
-            <option value="private_link" data-i18n="admin.modePrivateLink">Lien privé</option>
+            <option value="private_link" data-i18n="admin.modePrivateLink">Lien privé (tunnel de vente)</option>
             <option value="private_group" data-i18n="admin.modePrivateGroup">Groupe privé</option>
           </select>
 
-          <label class="form-label" data-i18n="admin.instructionsFr">Instructions (FR)</label>
+          <label class="form-label" data-i18n="admin.salesTunnelLink">Lien du tunnel de vente / lien privé</label>
+          <input id="offer-private-link" type="url" class="form-input" placeholder="https://mon-site-annexe.com/produit..." />
+          <p class="form-hint" data-i18n="admin.salesTunnelHint">Pour un produit numérique : URL du site annexe où le fichier est hébergé. Pour un service : lien privé/groupe.</p>
+
+          <label class="form-label" data-i18n="admin.instructionsFr">Instructions après achat (FR)</label>
           <textarea id="offer-instructions-fr" class="form-input" rows="3"></textarea>
 
-          <label class="form-label" data-i18n="admin.instructionsEn">Instructions (EN)</label>
+          <label class="form-label" data-i18n="admin.instructionsEn">Instructions après achat (EN)</label>
           <textarea id="offer-instructions-en" class="form-input" rows="3"></textarea>
 
-          <label class="form-label" data-i18n="admin.privateLink">Lien privé (optionnel)</label>
-          <input id="offer-private-link" type="url" class="form-input" placeholder="https://..." />
-
           <label class="form-label" data-i18n="admin.bookingLink">Lien de réservation (optionnel)</label>
-          <input id="offer-booking-link" type="url" class="form-input" placeholder="https://..." />
+          <input id="offer-booking-link" type="url" class="form-input" placeholder="https://calendly.com/..." />
 
           <label class="form-label" data-i18n="admin.contact">Contact (optionnel)</label>
           <input id="offer-contact" type="text" class="form-input" placeholder="WhatsApp / Telegram..." />
         </fieldset>
 
-        <!-- ============ Liens sociaux (commun) ============ -->
+        <!-- ============ Section Média ============ -->
+        <fieldset class="fieldset">
+          <legend data-i18n="admin.mediaLegend">Média (illustration du produit)</legend>
+
+          <label class="form-label" data-i18n="admin.mediaType">Type de média</label>
+          <select id="offer-media-type" class="form-input">
+            <option value="" data-i18n="admin.mediaNone">Aucun média</option>
+            <option value="demo" data-i18n="admin.mediaDemo">Démo (vidéo TikTok)</option>
+            <option value="image" data-i18n="admin.mediaImage">Images (upload sur GitHub)</option>
+          </select>
+
+          <!-- Sous-section Démo (TikTok) -->
+          <div id="media-demo-section" class="media-subsection hidden">
+            <label class="form-label" data-i18n="admin.tiktokUrl">URL de la vidéo TikTok</label>
+            <input id="offer-media-demo-url" type="url" class="form-input" placeholder="https://www.tiktok.com/@user/video/1234567890" />
+            <p class="form-hint" data-i18n="admin.tiktokHint">Collez l'URL complète de la vidéo TikTok. Elle sera intégrée (embed) sur la page produit.</p>
+          </div>
+
+          <!-- Sous-section Images (upload GitHub) -->
+          <div id="media-image-section" class="media-subsection hidden">
+            <label class="form-label" data-i18n="admin.uploadImages">Uploader des images</label>
+            <div class="upload-zone" id="image-upload-zone">
+              <input type="file" id="image-input" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple hidden />
+              <button type="button" id="image-upload-btn" class="btn btn-secondary">
+                <span data-i18n="admin.chooseImages">+ Choisir des images</span>
+              </button>
+              <p class="form-hint" data-i18n="admin.uploadHint">JPG, PNG, WebP, GIF, AVIF — max 5 Mo par image.</p>
+            </div>
+            <div id="image-preview-list" class="image-preview-list"></div>
+          </div>
+        </fieldset>
+
+        <!-- ============ Page de présentation (no-code) ============ -->
+        <fieldset class="fieldset">
+          <legend data-i18n="admin.presentationLegend">Page de présentation (configurable)</legend>
+
+          <label class="form-label" data-i18n="admin.summaryFr">Résumé long (FR)</label>
+          <textarea id="offer-summary-fr" class="form-input" rows="4" placeholder="Présentation détaillée du produit en français..."></textarea>
+
+          <label class="form-label" data-i18n="admin.summaryEn">Résumé long (EN)</label>
+          <textarea id="offer-summary-en" class="form-input" rows="4" placeholder="Detailed product presentation in English..."></textarea>
+
+          <!-- Points forts (liste dynamique FR) -->
+          <label class="form-label" data-i18n="admin.highlightsFr">Points forts (FR)</label>
+          <div id="highlights-fr-list" class="dynamic-list" data-list="highlights-fr"></div>
+          <button type="button" class="btn btn-secondary btn-sm add-row-btn" data-add="highlights-fr">
+            <span data-i18n="admin.addHighlight">+ Ajouter un point fort</span>
+          </button>
+
+          <!-- Points forts (liste dynamique EN) -->
+          <label class="form-label" data-i18n="admin.highlightsEn">Points forts (EN)</label>
+          <div id="highlights-en-list" class="dynamic-list" data-list="highlights-en"></div>
+          <button type="button" class="btn btn-secondary btn-sm add-row-btn" data-add="highlights-en">
+            <span data-i18n="admin.addHighlight">+ Ajouter un point fort</span>
+          </button>
+
+          <!-- Extraits (liste dynamique FR) -->
+          <label class="form-label" data-i18n="admin.excerptsFr">Extraits (FR) — titre + contenu</label>
+          <div id="excerpts-fr-list" class="dynamic-list" data-list="excerpts-fr"></div>
+          <button type="button" class="btn btn-secondary btn-sm add-row-btn" data-add="excerpts-fr">
+            <span data-i18n="admin.addExcerpt">+ Ajouter un extrait</span>
+          </button>
+
+          <!-- Extraits (liste dynamique EN) -->
+          <label class="form-label" data-i18n="admin.excerptsEn">Extraits (EN) — titre + contenu</label>
+          <div id="excerpts-en-list" class="dynamic-list" data-list="excerpts-en"></div>
+          <button type="button" class="btn btn-secondary btn-sm add-row-btn" data-add="excerpts-en">
+            <span data-i18n="admin.addExcerpt">+ Ajouter un extrait</span>
+          </button>
+        </fieldset>
+
+        <!-- ============ Liens sociaux ============ -->
         <fieldset class="fieldset">
           <legend data-i18n="admin.socialLegend">Liens sociaux / contact (optionnel)</legend>
           <div class="form-row">
@@ -234,9 +285,8 @@
     </div>
   </div>
 
-  <script type="module" src="../js/firebase-config.js"></script>
+  <script type="module" src="../js/config.js"></script>
   <script type="module" src="../js/i18n.js"></script>
-  <script type="module" src="../js/uploadcare-config.js"></script>
   <script type="module" src="admin.js"></script>
 </body>
 </html>
