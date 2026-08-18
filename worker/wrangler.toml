@@ -10,26 +10,46 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # -------------------------------------------------------------
+# Binding D1 (base de données SQLite native Cloudflare)
+# -------------------------------------------------------------
+# Pour créer la base (une seule fois) :
+#   npx wrangler d1 create beta-arsenal
+# Puis recopiez l'UUID renvoyé dans database_id ci-dessous.
+[[d1_databases]]
+binding = "DB"
+database_name = "beta-arsenal"
+database_id = "85276859-8854-4fd7-aeef-44ac800184ea"
+
+# -------------------------------------------------------------
 # Variables NON secrètes (visibles, configurables ici).
 # Les SECRETS doivent être définis via :
-#   wrangler secret put FIREBASE_CLIENT_EMAIL
-#   wrangler secret put FIREBASE_PRIVATE_KEY
-#   wrangler secret put FEDAPAY_SECRET_KEY
-#   wrangler secret put FEDAPAY_WEBHOOK_SECRET
-#   wrangler secret put UPLOADCARE_SECRET_KEY
+#   npx wrangler secret put JWT_SECRET
+#   npx wrangler secret put FEDAPAY_SECRET_KEY
+#   npx wrangler secret put FEDAPAY_WEBHOOK_SECRET
+#   npx wrangler secret put GITHUB_TOKEN
 # -------------------------------------------------------------
 
 [vars]
-FIREBASE_PROJECT_ID = "beta-arsenal"
 ADMIN_EMAIL = "admin@beta-arsenal.com"
 PUBLIC_SITE_URL = "https://beta-arsenal.pages.dev"
 FEDAPAY_PUBLIC_KEY = "pk_sandbox_xxxxxxxxxxxxxxxxxxxxxxxx"
-UPLOADCARE_PUBLIC_KEY = "xxxxxxxxxxxxxxxxxxxxxxxx"
-# Mode FedaPay : "sandbox" ou "live"
 FEDAPAY_MODE = "sandbox"
+
+# --- GitHub (stockage des images produits) ---
+# Dépôt où seront uploadées les images (API GitHub Contents).
+# Le GITHUB_TOKEN (secret) doit avoir la permission "Contents: write".
+GITHUB_REPO_OWNER = "your-github-username"
+GITHUB_REPO_NAME = "beta-arsenal"
+GITHUB_BRANCH = "main"
+GITHUB_IMAGE_PATH = "public/uploads/products"
 
 # -------------------------------------------------------------
 # Environnement de production (optionnel)
 # -------------------------------------------------------------
 [env.production]
 name = "beta-arsenal-api"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "beta-arsenal"
+database_id = "85276859-8854-4fd7-aeef-44ac800184ea"

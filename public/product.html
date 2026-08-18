@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bêta Arsenal — Produit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- ============ HEADER ============ -->
+    <header class="site-header">
+      <div class="container header-inner">
+        <a href="/" class="brand">
+          <span class="brand-mark">β</span>
+          <span class="brand-name">Bêta Arsenal</span>
+        </a>
+        <div class="header-actions">
+          <button id="lang-toggle" class="btn btn-ghost" aria-label="Changer la langue">
+            <span id="lang-label">EN</span>
+          </button>
+          <a href="/" class="btn btn-ghost" data-i18n="nav.home">Accueil</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ MAIN ============ -->
+    <main class="container main-content">
+      <!-- Lien retour -->
+      <a href="/" class="back-link">← <span data-i18n="product.back">Retour au catalogue</span></a>
+
+      <!-- Conteneur produit (rempli en JS) -->
+      <div id="product-container" aria-live="polite">
+        <!-- Skeleton de chargement -->
+        <div class="product-skeleton">
+          <div class="skeleton-media"></div>
+          <div class="skeleton-line w-60"></div>
+          <div class="skeleton-line w-90"></div>
+          <div class="skeleton-line w-80"></div>
+        </div>
+      </div>
+
+      <!-- État erreur -->
+      <div id="product-error" class="empty-state hidden">
+        <p data-i18n="product.notFound">Produit introuvable.</p>
+        <a href="/" class="btn btn-secondary" data-i18n="product.backHome">Retour à l'accueil</a>
+      </div>
+    </main>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>© <span id="year"></span> Bêta Arsenal</p>
+        <nav class="footer-nav">
+          <a href="/" data-i18n="nav.home">Accueil</a>
+          <a href="legal.html" data-i18n="nav.legal">Légal</a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ============ MODALE D'ACHAT (réutilisée) ============ -->
+  <div id="buy-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="buy-modal-title">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card">
+      <button class="modal-close" data-close-modal aria-label="Fermer">×</button>
+      <h2 id="buy-modal-title" data-i18n="buy.title">Finaliser votre achat</h2>
+      <div id="buy-offer-preview" class="offer-preview"></div>
+      <form id="buy-form" novalidate>
+        <label for="buyer-email" class="form-label" data-i18n="buy.emailLabel">Votre email</label>
+        <input
+          id="buyer-email"
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          placeholder="vous@exemple.com"
+          class="form-input"
+        />
+        <p class="form-hint" data-i18n="buy.emailHint">Le reçu et l'accès seront envoyés à cette adresse.</p>
+        <div id="buy-error" class="form-error hidden"></div>
+        <button id="buy-submit" type="submit" class="btn btn-primary btn-block">
+          <span data-i18n="buy.pay">Payer</span>
+          <span id="buy-price" class="btn-price"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ SCRIPTS ============ -->
+  <script type="module" src="js/config.js"></script>
+  <script type="module" src="js/i18n.js"></script>
+  <script type="module" src="js/product.js"></script>
+</body>
+</html>
